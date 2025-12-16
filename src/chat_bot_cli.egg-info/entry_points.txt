@@ -1,0 +1,2 @@
+[console_scripts]
+ai-chat-bot = ai_chat_bot.main:main

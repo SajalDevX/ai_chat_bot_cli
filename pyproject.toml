@@ -10,3 +10,13 @@ dependencies = [
     "pydantic-settings>=2.12.0",
     "rich>=14.2.0",
 ]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[project.scripts]
+ai-chat-bot = "ai_chat_bot.main:main"

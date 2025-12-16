@@ -1,17 +1,18 @@
 from enum import Enum
-from pydantic import BaseModel,Field
+from pydantic import BaseModel, Field
 
-class Role(BaseModel):
-    USER="user"
-    MODEL="model"
+
+class Role(str, Enum):
+    USER = "user"
+    MODEL = "model"
+
 
 class Message(BaseModel):
-    
-    role:Role=Field(
+    role: Role = Field(
         ...,
-        "Owner of the message"
-        ),
-    content:str=Field(
+        description="Owner of the message"
+    )
+    content: str = Field(
         ...,
         min_length=1,
         description="Message content"
