@@ -159,4 +159,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Author
 
-**Airo** - [SajalDevX](https://github.com/SajalDevX)
+**SajalDevX** - [SajalDevX](https://github.com/SajalDevX)
