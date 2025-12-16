@@ -19,8 +19,8 @@ A command-line chatbot powered by Google's Gemini API with streaming responses a
 
 1. **Clone the repository**
    ```bash
-   git clone <repository-url>
-   cd chat_bot_cli
+   git clone https://github.com/SajalDevX/ai_chat_bot_cli.git
+   cd ai_chat_bot_cli
    ```
 
 2. **Create a virtual environment**
@@ -155,4 +155,8 @@ chat_bot_cli/
 
 ## License
 
-MIT License
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Author
+
+**Airo** - [SajalDevX](https://github.com/SajalDevX)
