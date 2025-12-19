@@ -3,31 +3,25 @@ from pydantic import BaseModel, Field
 
 
 class Role(str, Enum):
+    SYSTEM = "system"
     USER = "user"
-    MODEL = "model"
+    ASSISTANT = "assistant"
 
 
 class Message(BaseModel):
-    role: Role = Field(
-        ...,
-        description="Owner of the message"
-    )
-    content: str = Field(
-        ...,
-        min_length=1,
-        description="Message content"
-    )
-    def to_api_format(self) -> dict:
-        return {
-            "role": self.role.value, 
-            "parts": [{"text": self.content}]
-        }
+    role: Role 
+    content: str 
+    
+    def __str__(self) -> str:
+        preview = self.content[:5] if len(self.content) > 50 else self.content
+        return f"{self.role.value}: {preview}..."
+
 class Conversation(BaseModel):
     
     messages: list[Message] = Field(
         default_factory=list, 
-        description="List of messages in the conversation",
     )    
+    system_prompt: str | None = None
     
     def add_message(self, role: Role, content: str) -> Message:
         message = Message(role=role, content=content)
@@ -37,13 +31,29 @@ class Conversation(BaseModel):
     def add_user_message(self, content: str) -> Message:
         return self.add_message(Role.USER, content)
     
-    def add_model_message(self, content: str) -> Message:
-        return self.add_message(Role.MODEL, content)
+    def get_messages_for_api(self) -> list[Message]:
+        messages = []
+        
+        if self.system_prompt:
+            messages.append(Message(role=Role.SYSTEM, content=self.system_prompt))
+        
+        messages.extend(self.messages)
+        return messages
+
+    def add_assistant_message(self, content: str) -> Message:
+        return self.add_message(Role.ASSISTANT, content)
+        
+    def set_system_prompt(self, prompt: str) -> None:
+        self.system_prompt = prompt
     
     def get_last_message(self) -> Message | None:
         if self.messages:
             return self.messages[-1]
         return None
+    
+    def clear_all(self) -> None:
+        self.messages.clear()
+        self.system_prompt = None
     
     def to_api_format(self) -> list[dict]:
         return [msg.to_api_format() for msg in self.messages]

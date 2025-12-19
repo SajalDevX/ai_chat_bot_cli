@@ -5,24 +5,31 @@ from ai_chat_bot.utils.exceptions import (
     APIError,
     AuthenticationError,
     RateLimitError,
+    ConfigurationError
 )
-from ai_chat_bot.models import Conversation
+import json
+from ai_chat_bot.models import Conversation, ChatResponse, Role, TokenUsage
 from typing import Generator
+from ai_chat_bot.clients.base import BaseClient
 
 
-class GeminiClient:
+class GeminiClient(BaseClient):
     "Client for Google's gemini Api"
     
+    PROVIDER_NAME = "gemini"
     BASE_URL = "https://generativelanguage.googleapis.com/v1beta"
     
     def __init__(self, settings: Settings | None = None) -> None:
         
-        self.settings = settings or get_settings()
-
+        settings = settings or get_settings()
+    
+        super().__init__(settings)
+        if not settings.gemini_api_key:
+            raise ConfigurationError("Gemini API key is not configured.")
         self.client = httpx.Client(
             timeout=httpx.Timeout(self.settings.timeout)
         )
-        self._api_url = (
+        self._chat_url = (
             f"{self.BASE_URL}/models/{self.settings.gemini_model}:generateContent"
         )
         self._stream_url = (
@@ -30,20 +37,33 @@ class GeminiClient:
         )
         
     def _build_payload(self,conversation:Conversation)-> dict:
-        return {
-            "contents":conversation.to_api_format(),
+        payload = {
             "generationConfig":{
                 "maxOutputTokens":self.settings.max_tokens,
                 "temperature": self.settings.temperature,
             }
-        }    
+        }
+        if conversation.system_prompt:
+            payload["system_instruction"] = {
+                "parts": [{"text": conversation.system_prompt}]
+            }
+            
+        contents =[]
+        for msg in conversation.messages:
+            role = "model" if msg.role == Role.ASSISTANT else "user"
+            contents.append({
+                "role":role,
+                "parts":[{"text":msg.content}]
+            })
+        payload["contents"] = contents        
+        return payload
         
     def chat(self,conversation:Conversation)->str:
         
         payload = self._build_payload(conversation)
         try:
             response = self.client.post(
-                self._api_url,
+                self._chat_url,
                 json = payload,
                 params={"key": self.settings.gemini_api_key}
             )
@@ -53,7 +73,7 @@ class GeminiClient:
             raise APIConnectionError(f"Request timed out: {e}")
         
         self._handle_response_errors(response)
-        return self._parse_response(response)
+        return self._parse_response(response.json())
         
     def _handle_response_errors(self, response: httpx.Response) -> None:
         """Check for HTTP errors and raise appropriate exceptions.
@@ -95,9 +115,9 @@ class GeminiClient:
         # Generic error for other status codes
         raise APIError(f"API error ({status}): {error_message}", status_code=status)
     
-    def _parse_response(self,response=httpx.Response)-> str:
+    def _parse_response(self,response=dict)-> ChatResponse:
         try:
-            data = response.json()
+            data = response
             candidates = data.get("candidates",[])
             if not candidates:
                 raise APIError("No response generated")
@@ -107,9 +127,24 @@ class GeminiClient:
             if not parts:
                 raise APIError("Empty response from api")
             
-            text_parts = [part.get("text","") for part in parts] 
+            content = "".join([part.get("text","") for part in parts])
+            if not content:
+                raise APIError("Empty response from api",provider=self.PROVIDER_NAME)
             
-            return "".join(text_parts) 
+            usage_data = data.get("usageMetadata",{})
+            usage = TokenUsage(
+            prompt_tokens=usage_data.get("promptTokenCount", 0),
+            completion_tokens=usage_data.get("candidatesTokenCount", 0),
+            )
+            finish_reason = candidates[0].get("finishReason","").lower()
+            
+            return ChatResponse(
+                content=content,
+                model = self.settings.gemini_model,
+                provider=self.PROVIDER_NAME,
+                usage=usage,
+                finish_reason=finish_reason
+            )
         except KeyError as e:
             raise APIError(f"Unexpected response format: missing {e}")
         except Exception as e:
@@ -146,7 +181,7 @@ class GeminiClient:
         except httpx.TimeoutException as e:
             raise APIConnectionError(f"Request timed out: {e}")
     
-    def _parse_stream(self, response: httpx.Response) -> Generator[str, None, None]:
+    def _parse_stream(self, response: dict) -> Generator[str, None, None]:
         """Parse streaming response and yield text chunks.
         
         Gemini streaming uses Server-Sent Events (SSE) format:
@@ -157,9 +192,7 @@ class GeminiClient:
             
         Yields:
             Text chunks extracted from SSE data
-        """
-        import json
-        
+        """        
         # Iterate over lines in the stream
         for line in response.iter_lines():
             # Skip empty lines

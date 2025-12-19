@@ -8,11 +8,14 @@ class ChatbotError(Exception):
     Attributes:
         message: Human-readable error description
     """
-    def __init__(self,message:str)->None:
+    def __init__(self,message:str,provider:str)->None:
         self.message = message
+        self.provider = provider
         super().__init__(self.message)
             
     def __str__(self) -> str:
+        if self.provider:
+            return f"[{self.provider}] {self.message}"
         return self.message
     
 class ConfigurationError(ChatbotError):
@@ -33,9 +36,9 @@ class APIError(ChatbotError):
         status_code: HTTP status code (if available)
     """
     
-    def __init__(self, message: str, status_code: int | None = None) -> None:
+    def __init__(self, message: str, status_code: int | None = None, provider: str | None = None) -> None:
         self.status_code = status_code
-        super().__init__(message)
+        super().__init__(message, provider)
 
 
 class AuthenticationError(APIError):
@@ -44,8 +47,8 @@ class AuthenticationError(APIError):
     Usually means invalid or expired API key.
     """
     
-    def __init__(self, message: str = "Invalid API key") -> None:
-        super().__init__(message, status_code=401)
+    def __init__(self, message: str = "Invalid API key", provider: str | None = None) -> None:
+        super().__init__(message, status_code=401, provider=provider)
 
 
 class RateLimitError(APIError):
@@ -58,12 +61,12 @@ class RateLimitError(APIError):
     def __init__(
         self, 
         message: str = "Rate limit exceeded", 
-        retry_after: int | None = None
-    ) -> None:
+        retry_after: int | None = None,
+        provider: str | None = None
+    ):
+        super().__init__(message, status_code=429, provider=provider)
         self.retry_after = retry_after
-        super().__init__(message, status_code=429)
-
-
+        
 class APIConnectionError(APIError):
     """Raised when unable to connect to the API.
     
@@ -82,3 +85,20 @@ class ValidationError(ChatbotError):
         - Message too long
     """
     pass
+
+class AllProvidersFailedError(ChatbotError):
+    """All configured providers failed (NEW).
+    
+    Used when multi-provider fallback exhausts all options.
+    """
+    
+    def __init__(self, errors: list[ChatbotError]):
+        self.errors = errors
+        
+        provider_errors = []
+        for e in errors:
+            provider = e.provider or "unknown"
+            provider_errors.append(f"{provider}: {e.message}")
+        
+        message = "All providers failed:\n  " + "\n  ".join(provider_errors)
+        super().__init__(message)
