@@ -66,6 +66,7 @@ class GroqClient(BaseClient):
         )
         
         self._chat_url = f"{self.BASE_URL}/chat/completions"
+        self.last_stream_usage = TokenUsage | None = None
     
     def _build_payload(self, conversation: Conversation) -> dict:
         """Convert conversation to OpenAI/Groq format.
@@ -159,9 +160,16 @@ class GroqClient(BaseClient):
         return self._parse_response(response.json())
     
     def chat_stream(self, conversation: Conversation) -> Generator[str, None, None]:
-        """Stream response - same as OpenAI."""
+        """Stream response - same as OpenAI.
+
+        Uses stream_options to include usage statistics in the final chunk.
+        Token usage is stored in self.last_stream_usage after streaming.
+        """
         payload = self._build_payload(conversation)
         payload["stream"] = True
+        # Request usage stats in streaming mode (OpenAI-compatible feature)
+        # Without this, we can't get token counts during streaming
+        payload["stream_options"] = {"include_usage": True}
         
         try:
             with self.client.stream("POST", self._chat_url, json=payload) as response:
@@ -180,17 +188,8 @@ class GroqClient(BaseClient):
     
 
     def _parse_stream(self, response: dict) -> Generator[str, None, None]:
-        """Parse streaming response and yield text chunks.
-        
-        Gemini streaming uses Server-Sent Events (SSE) format:
-        data: {"candidates": [{"content": {"parts": [{"text": "..."}]}}]}
-        
-        Args:
-            response: The streaming HTTP response
-            
-        Yields:
-            Text chunks extracted from SSE data
-        """        
+         
+        self.last_stream_usage = None 
         # Iterate over lines in the stream
         for line in response.iter_lines():
             # Skip empty lines
@@ -207,17 +206,20 @@ class GroqClient(BaseClient):
                 
                 try:
                     data = json.loads(json_str)
-                    
-                    candidates = data.get("candidates", [])
-                    if candidates:
-                        content = candidates[0].get("content", {})
-                        parts = content.get("parts", [])
-                        
-                        for part in parts:
-                            text = part.get("text", "")
-                            if text:
-                                yield text
-                                
+                    choices = data.get("choices",[])
+                    if choices:
+                            delta = choices[0].get("delta",{})
+                            content = delta.get("content","")
+                            
+                            if content:
+                                yield content
+                
+                    usage_data = data.get("usage") 
+                    if usage_data:
+                        self.last_stream_usage = TokenUsage(
+                            prompt_tokens= usage_data.get("prompt_tokens",0),
+                            completion_tokens= usage_data.get("completion_tokens",0)
+                        )               
                 except json.JSONDecodeError:
                     continue
             

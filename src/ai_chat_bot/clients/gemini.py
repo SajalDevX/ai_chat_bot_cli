@@ -35,6 +35,7 @@ class GeminiClient(BaseClient):
         self._stream_url = (
             f"{self.BASE_URL}/models/{self.settings.gemini_model}:streamGenerateContent"
         )
+        self.last_stream_usage: TokenUsage | None = None
         
     def _build_payload(self,conversation:Conversation)-> dict:
         payload = {
@@ -193,6 +194,7 @@ class GeminiClient(BaseClient):
         Yields:
             Text chunks extracted from SSE data
         """        
+        self.last_stream_usage = None
         # Iterate over lines in the stream
         for line in response.iter_lines():
             # Skip empty lines
@@ -219,7 +221,13 @@ class GeminiClient(BaseClient):
                             text = part.get("text", "")
                             if text:
                                 yield text
-                                
+                
+                    usage_data = data.get("usageMetadata")  # Note: lowercase 'd'  
+                    if usage_data:
+                        self.last_stream_usage = TokenUsage(
+                            prompt_tokens = usage_data.get("promptTokenCount",0),
+                            completion_tokens = usage_data.get("candidatesTokenCount",0)
+                        )              
                 except json.JSONDecodeError:
                     continue
                     

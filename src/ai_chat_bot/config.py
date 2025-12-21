@@ -61,7 +61,7 @@ class Settings(BaseSettings):
     
     def has_groq(self) -> bool:
         """Check if Groq is configured."""
-        return self.has_groq is not None
+        return self.groq_api_key is not None
     
     def has_anthropic(self) -> bool:
         """Check if Anthropic is configured."""

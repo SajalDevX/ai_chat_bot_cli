@@ -62,7 +62,7 @@ class ChatBot:
         self.display.thinking()
         try:
             response = self.client.chat(self.conversation)
-            self.conversation.add_model_message(response)
+            self.conversation.add_assistant_message(response)
             
             self.display.assistant_message(response)
             self.display.stats(model=self.client.settings.gemini_model)
@@ -165,10 +165,13 @@ class ChatBot:
             self.display.assistant_stream_end()
             
             # Add complete response to conversation history
-            self.conversation.add_model_message(full_response)
+            self.conversation.add_assistant_message(full_response)
+            tokens = None
+            if self.client.last_stream_usage:
+                tokens = self.client.last_stream_usage.total_tokens
             
             # Show stats
-            self.display.stats(model=self.client.settings.gemini_model)
+            self.display.stats(model=self.client.settings.gemini_model,tokens=tokens)
             
         except AuthenticationError as e:
             self.display.assistant_stream_end()  # Clean up display
