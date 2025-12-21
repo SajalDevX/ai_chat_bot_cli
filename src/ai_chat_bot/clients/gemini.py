@@ -15,10 +15,10 @@ from ai_chat_bot.clients.base import BaseClient
 
 class GeminiClient(BaseClient):
     "Client for Google's gemini Api"
-    
+
     PROVIDER_NAME = "gemini"
     BASE_URL = "https://generativelanguage.googleapis.com/v1beta"
-    
+
     def __init__(self, settings: Settings | None = None) -> None:
         
         settings = settings or get_settings()
@@ -36,7 +36,12 @@ class GeminiClient(BaseClient):
             f"{self.BASE_URL}/models/{self.settings.gemini_model}:streamGenerateContent"
         )
         self.last_stream_usage: TokenUsage | None = None
-        
+
+    @property
+    def model_name(self) -> str:
+        """Return the current Gemini model name."""
+        return self.settings.gemini_model
+
     def _build_payload(self,conversation:Conversation)-> dict:
         payload = {
             "generationConfig":{

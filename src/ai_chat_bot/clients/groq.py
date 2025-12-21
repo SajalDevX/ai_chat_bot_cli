@@ -66,8 +66,13 @@ class GroqClient(BaseClient):
         )
         
         self._chat_url = f"{self.BASE_URL}/chat/completions"
-        self.last_stream_usage = TokenUsage | None = None
-    
+        self.last_stream_usage : TokenUsage | None = None
+
+    @property
+    def model_name(self) -> str:
+        """Return the current Groq model name."""
+        return self.settings.groq_model
+
     def _build_payload(self, conversation: Conversation) -> dict:
         """Convert conversation to OpenAI/Groq format.
         

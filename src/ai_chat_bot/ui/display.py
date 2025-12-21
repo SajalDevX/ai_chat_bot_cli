@@ -79,15 +79,22 @@ class Display:
         text.append("Thinking...", style="dim italic")
         self.console.print(text)
     
-    def stats(self, model: str, tokens: int | None = None) -> None:
+    def stats(
+        self,
+        model: str,
+        tokens: int | None = None,
+        cost: float | None = None
+    ) -> None:
         """Display response statistics."""
         self.console.print()
         self.console.print("─" * 50, style="dim")
-        
+
         text = Text()
         text.append("📊 ", style="dim")
         if tokens:
-            text.append(f"Tokens: {tokens} | ", style="dim")
+            text.append(f"Tokens: {tokens:,} | ", style="dim")
+        if cost and cost > 0:
+            text.append(f"Cost: ${cost:.6f} | ", style="dim")
         text.append(f"Model: {model}", style="dim")
         self.console.print(text)
     

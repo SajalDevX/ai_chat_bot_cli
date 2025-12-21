@@ -5,14 +5,20 @@ from ai_chat_bot.models import Conversation, ChatResponse
 
 
 class BaseClient(ABC):
-    
+
     PROVIDER_NAME: str = "base"
     BASE_URL: str = ""
 
     def __init__(self, settings: Settings):
         self.settings = settings
-        
-    @abstractmethod    
+
+    @property
+    @abstractmethod
+    def model_name(self) -> str:
+        """Return the current model name for this provider."""
+        pass
+
+    @abstractmethod
     def chat(self, conversation: Conversation) -> ChatResponse:
         """Send a chat request and get the full response."""
         pass
